@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load socialaccount %}
+{% block content %}
+
+<div class="container mt-3">
+    <div class="card">
+        <h1 class="text-dark card-header fs-4">My To-Do Lists</h1>
+        <div class = "card-body">
+            <form action="" method="GET" class="p-2 pb-3 mb-3 bg-secondary rounded">
+                <div class="form-group mt-2">
+                    <label class="fs-6 text-light mb-2">Keyword in list's name</label>
+                    <input type="text" class="form-control" placeholder="Any keyword in list's name" name="q">
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-lg-4 col-md-6">
+                        <label class="fs-6 text-light mb-1">Last updated since</label>
+                        <input type="date" class="form-control" class="form-control" id="selectedDate" name="selectedDate">
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <label class="fs-6 text-light mb-1">Status</label>
+                        <input type="text" class="form-control" placeholder="Any" name="status">
+                    </div>
+                    <div class="col-lg-4 col-md-12">
+                        <label class="fs-6 text-light mb-1">Min. Size</label>
+                        <input type="text" class="form-control" placeholder="Items Amount" name="itemsCount">
+                    </div>
+                </div>
+                <div class="col-12 text-end mt-3">
+                    <button type="submit" class="btn btn-dark mg-auto">Filter results</button>
+                </div>
+            </form>
+            <table class="table table-md table-bordered table-dark rounded">
+                <thead>
+                    <th class="col-4">Name</th>
+                    <th class="col-1">Status</th>
+                    <th class="col-1">#</th>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
