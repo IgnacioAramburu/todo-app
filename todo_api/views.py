@@ -1,4 +1,3 @@
-from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.status import (
@@ -11,57 +10,15 @@ from rest_framework.status import (
     HTTP_409_CONFLICT,
     HTTP_500_INTERNAL_SERVER_ERROR
 )
-from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
-from .serializer import UserSerializer, ToDoListSerializer, ToDoItemSerializer
+from .serializer import ToDoListSerializer, ToDoItemSerializer
 from .models import  ToDoList, ToDoItem
-
-class UsersView(APIView):
-        
-        def get(self,request,*args,**kwargs):
-            user_email = kwargs.get("user_email")
-
-            if not user_email:
-                users = User.objects.all()
-                serializer = UserSerializer(users,many=True)
-                return Response(serializer.data, status = HTTP_200_OK)
-            
-            try:
-                user = User.objects.get(email=user_email)
-                serializer = UserSerializer(user,many=False)
-                return Response(serializer.data, status = HTTP_200_OK)
-            except User.DoesNotExist:
-                return Response({'detail': 'Users not found'}, status = HTTP_404_NOT_FOUND)
-            except Exception:
-                return Response({'detail': 'Internal Server Error'}, status = HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        def post(self,request,*args,**kwargs):
-            new_user_data = request.data
-            new_user_data['password'] = 'test'
-
-            try:
-                user = User.objects.get(email=new_user_data["email"])
-            except User.DoesNotExist:
-                try:
-                    serializer = UserSerializer(data=new_user_data)
-
-                    if serializer.is_valid():
-                        serializer.save()
-                        return Response(serializer.data, status = HTTP_201_CREATED)
-                    
-                    return Response(serializer.errors, status = HTTP_400_BAD_REQUEST)
-                except Exception:
-                    return Response({'detail': 'Internal Server Error'}, status = HTTP_500_INTERNAL_SERVER_ERROR)
-            else:
-                return Response({'detail':f'There is already an user with mail {user.email}.'}, status = HTTP_409_CONFLICT)
-            
 
 class ToDoListView(APIView):
 
     def get(self,request,*args,**kwargs):
         filter_data = request.data
         target_list_id = kwargs.get('id')
-        user_email = kwargs.get('user_email')
 
         #Check if query_params include_items is present and its value. If true returns ToDoList instances with related ToDoItem instances info. If false, only ToDoList
         include_items = request.query_params.get('include_items', None)
@@ -71,7 +28,7 @@ class ToDoListView(APIView):
         serializer_context = {'include_items': include_items}
 
         try:
-            if not target_list_id and not filter_data and not user_email:
+            if not target_list_id and not filter_data:
                 lists = ToDoList.objects.all()
                 serializer = ToDoListSerializer(lists,many=True,context=serializer_context)
                 return Response(serializer.data, status = HTTP_200_OK)
@@ -80,10 +37,6 @@ class ToDoListView(APIView):
                 list = ToDoList.objects.get(id=target_list_id)
                 serializer = ToDoListSerializer(list,many=False,context=serializer_context)
                 return Response(serializer.data, status = HTTP_200_OK)
-            
-            if user_email:
-                user = User.objects.get(email=user_email)
-                filter_data["last_updated_by"] = user
 
             lists = ToDoList.objects.filter(**filter_data)
             serializer = ToDoListSerializer(lists,many=True,context=serializer_context)
@@ -95,39 +48,22 @@ class ToDoListView(APIView):
         
     def post(self,request,*args,**kwargs):
         new_list_data = request.data
-        user_email = kwargs.get('user_email')
 
-        if not user_email:
-            return Response("This operation requires user_email as path_parameter", status = HTTP_400_BAD_REQUEST)
+        serializer = ToDoListSerializer(data=new_list_data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status = HTTP_201_CREATED)
         
-        try:
-            user = User.objects.get(email = user_email)
-        except User.DoesNotExist:
-            return Response({'detail':"User not found. Operation cannot be performed"}, status = HTTP_409_CONFLICT)
-        else:
-            new_list_data["last_updated_by"] = user.id
-            serializer = ToDoListSerializer(data=new_list_data)
-
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status = HTTP_201_CREATED)
-            
-            return Response(serializer.errors, status = HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status = HTTP_400_BAD_REQUEST)
     
     def put(self,request,*args,**kwargs):
         data_to_update = request.data
         target_list_id = kwargs.get('id')
-        user_email = kwargs.get('user_email')
-
-        if not user_email:
-            return Response("This operation requires user_email as path_parameter", status = HTTP_400_BAD_REQUEST)
         
         try:
             _list = ToDoList.objects.get(id=target_list_id)
             serializer = ToDoListSerializer(_list,data_to_update,partial=True)
-
-            if _list.last_updated_by.email != user_email:
-                return Response({'detail': 'User email should be the same that the one that created the list'}, status = HTTP_409_CONFLICT)
             
             if serializer.is_valid():
                 serializer.save()
@@ -141,14 +77,10 @@ class ToDoListView(APIView):
             
     def delete(self,request,*args,**kwargs):
         target_list_id = kwargs.get('id')
-        user_email = kwargs.get('user_email')
 
         try:
             _list = ToDoList.objects.get(id=target_list_id)
 
-            if _list.last_updated_by.email != user_email:
-                return Response({'detail': 'User email should be the same that the one that created the list'}, status = HTTP_409_CONFLICT)
-            
             _list.delete()
 
             return Response({'detail': 'Sucessfully deleted'}, status = HTTP_204_NO_CONTENT)
@@ -190,21 +122,13 @@ class ToDoItemView(APIView):
         
     def post(self,request,*args,**kwargs):
         new_item_data = request.data
-        user_email = kwargs.get('user_email')
         list_id = kwargs.get('list_id')
 
-        if not user_email:
-            return Response("This operation requires user_email as path_parameter", status = HTTP_400_BAD_REQUEST)
-        
         try:
             _list = ToDoList.objects.get(id=list_id)
 
-            if _list.last_updated_by.email != user_email:
-                return Response({'detail': 'User email should be the same that the one that created the list'}, status = HTTP_409_CONFLICT)
-            
             new_item_data["list"] = _list.id
-        except User.DoesNotExist:
-            return Response({'detail':"User not found. Operation cannot be performed"}, status = HTTP_409_CONFLICT)
+
         except ObjectDoesNotExist:
             return Response({'detail':"List not found. Operation cannot be performed"}, status = HTTP_409_CONFLICT)
         else:
@@ -225,17 +149,10 @@ class ToDoItemView(APIView):
     def put(self,request,*args,**kwargs):
         data_to_update = request.data
         target_item_id = kwargs.get('id')
-        user_email = kwargs.get('user_email')
 
-        if not user_email:
-            return Response("This operation requires user_email as path_parameter", status = HTTP_400_BAD_REQUEST)
-        
         try:
             item = ToDoItem.objects.get(id=target_item_id)
 
-            if item.list.last_updated_by.email != user_email:
-                return Response({'detail': 'User email should be the same that the one that created the list'}, status = HTTP_409_CONFLICT)
-            
             item_serializer = ToDoItemSerializer(item,data_to_update,partial=True)
 
             if item_serializer.is_valid():
@@ -259,13 +176,9 @@ class ToDoItemView(APIView):
             
     def delete(self,request,*args,**kwargs):
         target_item_id = kwargs.get('id')
-        user_email = kwargs.get('user_email')
 
         try:
             item = ToDoItem.objects.get(id=target_item_id)
-
-            if item.list.last_updated_by.email != user_email:
-                return Response({'detail': 'User email should be the same that the one that created the list'}, status = HTTP_409_CONFLICT)
             
             item.delete()
 
@@ -274,7 +187,7 @@ class ToDoItemView(APIView):
             list_data_update = {"completed":False} if uncompleted_items else {"completed":True}
             list_data_update = {**list_data_update,'size':item.list.size-1}
             list_serializer = ToDoListSerializer(item.list,list_data_update,partial=True)
-            
+
             if list_serializer.is_valid():
                 list_serializer.save()
 

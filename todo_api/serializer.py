@@ -1,13 +1,7 @@
 from rest_framework.exceptions import APIException
 from rest_framework import serializers
-from django.contrib.auth.models import User
 from .models import ToDoList, ToDoItem
 from datetime import date
-
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = '__all__'
 
 class ToDoItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -35,7 +29,7 @@ class ToDoListSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         include_items = self.context.get('include_items')
-        
+
         if include_items:
             return super().to_representation(instance)
         else:
